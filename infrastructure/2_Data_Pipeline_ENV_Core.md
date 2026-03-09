@@ -178,30 +178,28 @@
  
  _الشيفرة المعمارية الحاكمة (Architectural Guardrail):_
 
-> Python
-> 
-> ```
-> import ray
-> import polars as pl
-> 
-> # 1. تعريف العامل (Worker) ليعمل في نواة معزولة
-> @ray.remote
-> def process_grid_chunk(chunk_file_path):
->     # استخدام القراءة الكسولة (Lazy) لمنع اختناق الرام
->     processed_chunk = (
->         pl.scan_parquet(chunk_file_path)
->         .group_by_dynamic("timestamp", every="15m", group_by="meter_id")
->         .agg(pl.col("voltage").mean())
->         .collect() # التنفيذ الفوري السريع
->     )
->     return processed_chunk
-> 
-> # 2. إطلاق العمال بالتوازي وتجميع النتائج
-> futures = [process_grid_chunk.remote(path) for path in file_paths]
-> final_dataset = pl.concat(ray.get(futures))
-> ```
+```python
+import ray
+import polars as pl
 
----
+# 1. تعريف العامل (Worker) ليعمل في نواة معزولة
+@ray.remote
+def process_grid_chunk(chunk_file_path):
+    # استخدام القراءة الكسولة (Lazy) لمنع اختناق الرام
+    processed_chunk = (
+        pl.scan_parquet(chunk_file_path)
+        .group_by_dynamic("timestamp", every="15m", group_by="meter_id")
+        .agg(pl.col("voltage").mean())
+        .collect() # التنفيذ الفوري السريع
+    )
+    return processed_chunk
+
+# 2. إطلاق العمال بالتوازي وتجميع النتائج
+futures = [process_grid_chunk.remote(path) for path in file_paths]
+final_dataset = pl.concat(ray.get(futures))
+
+```
+
 
 ## 5. الجدول النهائي الشامل (master_dataset.parquet)
 
