@@ -28,3 +28,4 @@ This project is licensed under the **GNU Affero General Public License v3.0 (AGP
 **Developed by:** AretCore Labs  
 
 **Copyright (c) 2026 Mudaser (AretCore). All rights reserved.**
+# Licensed under AGPL-3.0
