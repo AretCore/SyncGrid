@@ -260,7 +260,14 @@ final_dataset = pl.concat(ray.get(futures))
 
 لكي يستطيع الـ GPU معالجة البيانات بكفاءة، يقوم بدمج كافة المعلومات اللحظية الخاصة بالعقد في مصفوفة واحدة ثنائية الأبعاد تسمى $X$. بالنسبة لشبكة مكونة من 33 عقدة، يكون شكل المصفوفة (33 صفاً × 4 أعمدة) كالتالي:
 
-$$X = \begin{bmatrix} P_1 & Q_1 & \sin & \cos \\ P_2 & Q_2 & \sin & \cos \\ \vdots & \vdots & \vdots & \vdots \\ P_{33} & Q_{33} & \sin & \cos \end{bmatrix}$$
+$$
+X = \begin{bmatrix} 
+P_1 & Q_1 & \sin & \cos \\ 
+P_2 & Q_2 & \sin & \cos \\ 
+\vdots & \vdots & \vdots & \vdots \\ 
+P_{33} & Q_{33} & \sin & \cos 
+\end{bmatrix}
+$$
 
 تم أخذ العنصر الأول من متجهات P و Q والوقت الدوري، ووضعهم في الصف الأول (الذي يمثل العقدة الأولى)، وتكررت العملية لكل الـ 33 عقدة.
 
@@ -273,7 +280,19 @@ $$X = \begin{bmatrix} P_1 & Q_1 & \sin & \cos \\ P_2 & Q_2 & \sin & \cos \\ \vdo
 - على سبيل المثال، لو كان `Batch_Size = 32`، ستندمج العقد لتصبح المصفوفة بأبعاد `[1056, 4]`، وشكلها الداخلي كالتالي (لاحظ الخط الفاصل بين المحاكاة الأولى والثانية):
     
 
-$$X_{batch} = \left[ \begin{array}{cccc} 50.0 & 10.0 & 0.0 & 1.0 \\ 20.0 & 5.0 & 0.0 & 1.0 \\ \vdots & \vdots & \vdots & \vdots \\ 45.0 & 8.0 & 0.0 & 1.0 \\ \hline 75.0 & 15.0 & 0.5 & -0.866 \\ 30.0 & 7.5 & 0.5 & -0.866 \\ \vdots & \vdots & \vdots & \vdots \\ 67.5 & 12.0 & 0.5 & -0.866 \end{array} \right]$$
+$$
+X\_{batch} = \left[ \begin{array}{cccc} 
+50.0 & 10.0 & 0.0 & 1.0 \\ 
+20.0 & 5.0 & 0.0 & 1.0 \\ 
+\vdots & \vdots & \vdots & \vdots \\ 
+45.0 & 8.0 & 0.0 & 1.0 \\ 
+\hline 
+75.0 & 15.0 & 0.5 & -0.866 \\ 
+30.0 & 7.5 & 0.5 & -0.866 \\ 
+\vdots & \vdots & \vdots & \vdots \\ 
+67.5 & 12.0 & 0.5 & -0.866 
+\end{array} \right]
+$$
 
 ### ج. هندسة الروابط وتحديث الحساسية (Edge_Index & Edge_Attr)
 
@@ -283,13 +302,27 @@ $$X_{batch} = \left[ \begin{array}{cccc} 50.0 & 10.0 & 0.0 & 1.0 \\ 20.0 & 5.0 &
 
 عند دمج المحاكاة الثانية (التي تبدأ عقدتها الأولى برقم 33 في المصفوفة العملاقة)، يقوم الـ `DataLoader` تلقائياً بجمع الرقم 33 على كافة مؤشرات `edge_index` الخاصة بتلك المحاكاة لضمان عدم تداخل الشبكات.
 
-$$Edge\_Index_{batch} = \begin{bmatrix} 0 & 1 & 1 & 2 & \dots & 31 & 32 & \mathbf{33} & \mathbf{34} & \mathbf{34} & \mathbf{35} & \dots & \mathbf{64} & \mathbf{65} \\ 1 & 0 & 2 & 1 & \dots & 32 & 31 & \mathbf{34} & \mathbf{33} & \mathbf{35} & \mathbf{34} & \dots & \mathbf{65} & \mathbf{64} \end{bmatrix}$$
+$$
+Edge\_Index\_{batch} = \left[ \begin{array}{cccccccccccccc} 
+0 & 1 & 1 & 2 & \dots & 31 & 32 & \mathbf{33} & \mathbf{34} & \mathbf{34} & \mathbf{35} & \dots & 64 & 65 \\ 
+1 & 0 & 2 & 1 & \dots & 32 & 31 & \mathbf{34} & \mathbf{33} & \mathbf{35} & \mathbf{34} & \dots & 65 & 64 
+\end{array} \right]
+$$
 
 **2. التراص العمودي للحساسيات (Vertical Stacking في `edge_attr`):**
 
 بالتزامن التام مع `edge_index`، تُرص قيم الحساسية اللحظية $\left[ \frac{\partial V}{\partial P}, \frac{\partial V}{\partial Q} \right]$ عمودياً لتكوين مصفوفة ضخمة تغطي كل الروابط في الدفعة. _(ملاحظة: تكرار القيم في أول صفين يمثل الاتجاهين المزدوجين للرابط الفيزيائي $0 \to 1$ و $1 \to 0$ نظراً لتماثل الخصائص الفيزيائية للناقل نفسه)._
 
-$$Edge\_Attr_{batch} = \left[ \begin{array}{cc} -0.0015 & -0.0020 \\ -0.0015 & -0.0020 \\ \vdots & \vdots \\ \hline -0.0018 & -0.0022 \\ \vdots & \vdots \end{array} \right]$$
+$$
+Edge\_Attr\_{batch} = \left[ \begin{array}{cc} 
+-0.0015 & -0.0020 \\ 
+-0.0015 & -0.0020 \\ 
+\vdots & \vdots \\ 
+\hline 
+-0.0018 & -0.0022 \\ 
+\vdots & \vdots 
+\end{array} \right]
+$$
 
 **3. الفرق الجوهري (الثبات مقابل الديناميكية):**
 
@@ -302,19 +335,18 @@ $$Edge\_Attr_{batch} = \left[ \begin{array}{cc} -0.0015 & -0.0020 \\ -0.0015 & -
  
 _الشيفرة المعمارية الحاكمة (Architectural Guardrail):_
  
-> Python
-> 
-> ```
-> import polars as pl
-> import torch
-> 
-> # 1. الاستقبال السريع دون نسخ (Arrow-backed)
-> df = pl.read_parquet("data_from_greptime.parquet") 
-> 
-> # 2. التحويل المباشر لـ Tensor عبر مؤشر الذاكرة (Memory View)
-> # الدالة to_numpy هنا تمرر المؤشر ولا تنسخ البيانات أبداً
-> tensor_data = torch.from_numpy(df.select(["voltage", "p_kw", "q_kvar"]).to_numpy())
-> ```
+```python
+import polars as pl
+import torch
+
+# 1. الاستقبال السريع دون نسخ (Arrow-backed)
+df = pl.read_parquet("data_from_greptime.parquet") 
+
+# 2. التحويل المباشر لـ Tensor عبر مؤشر الذاكرة (Memory View)
+# الدالة to_numpy هنا تمرر المؤشر ولا تنسخ البيانات أبداً
+tensor_data = torch.from_numpy(df.select(["voltage", "p_kw", "q_kvar"]).to_numpy())
+
+```
 
 
 ---
@@ -344,7 +376,9 @@ _الشيفرة المعمارية الحاكمة (Architectural Guardrail):_
     
 - **المعادلة:**
     
-    $$H_{latent} = PowerGAT\_Conv(X', Edge\_Index, Edge\_Attr)$$
+$$
+H\_{latent} = PowerGAT\_Conv(X', Edge\_Index, Edge\_Attr)
+$$
     
 - **التنفيذ العملي لآلية الانتباه (Attention Mechanism):** يقرأ المعالج خريطة الاتصال (`Edge_Index`) ويقوم بدمج ميزات العقدة المُرسلة مع الخصائص الفيزيائية اللحظية للرابط (`Edge_Attr`). يعتمد المعالج في حساب "معامل الانتباه" ($\alpha_{ij}$) على قيم $\left[ \frac{\partial V}{\partial P}, \frac{\partial V}{\partial Q} \right]$ المستخرجة من أجهزة ESP32. هذا يوجه شبكة الـ GNN لفهم مدى التأثير الفيزيائي الفعلي لكل عقدة على جارتها في تلك اللحظة الزمنية، متجاوزاً القيود الساذجة للمسافات الجغرافية أو مقاومات الكابلات النظرية الثابتة.
     
