@@ -273,7 +273,7 @@ $$X = \begin{bmatrix} P_1 & Q_1 & \sin & \cos \\ P_2 & Q_2 & \sin & \cos \\ \vdo
 - على سبيل المثال، لو كان `Batch_Size = 32`، ستندمج العقد لتصبح المصفوفة بأبعاد `[1056, 4]`، وشكلها الداخلي كالتالي (لاحظ الخط الفاصل بين المحاكاة الأولى والثانية):
     
 
-$$X_{batch} = \begin{bmatrix} 50.0 & 10.0 & 0.0 & 1.0 \\ 20.0 & 5.0 & 0.0 & 1.0 \\ \vdots & \vdots & \vdots & \vdots \\ 45.0 & 8.0 & 0.0 & 1.0 \\ \hline 75.0 & 15.0 & 0.5 & -0.866 \\ 30.0 & 7.5 & 0.5 & -0.866 \\ \vdots & \vdots & \vdots & \vdots \\ 67.5 & 12.0 & 0.5 & -0.866 \end{bmatrix}$$
+$$X_{batch} = \left[ \begin{array}{cccc} 50.0 & 10.0 & 0.0 & 1.0 \\ 20.0 & 5.0 & 0.0 & 1.0 \\ \vdots & \vdots & \vdots & \vdots \\ 45.0 & 8.0 & 0.0 & 1.0 \\ \hline 75.0 & 15.0 & 0.5 & -0.866 \\ 30.0 & 7.5 & 0.5 & -0.866 \\ \vdots & \vdots & \vdots & \vdots \\ 67.5 & 12.0 & 0.5 & -0.866 \end{array} \right]$$
 
 ### ج. هندسة الروابط وتحديث الحساسية (Edge_Index & Edge_Attr)
 
@@ -289,7 +289,7 @@ $$Edge\_Index_{batch} = \begin{bmatrix} 0 & 1 & 1 & 2 & \dots & 31 & 32 & \mathb
 
 بالتزامن التام مع `edge_index`، تُرص قيم الحساسية اللحظية $\left[ \frac{\partial V}{\partial P}, \frac{\partial V}{\partial Q} \right]$ عمودياً لتكوين مصفوفة ضخمة تغطي كل الروابط في الدفعة. _(ملاحظة: تكرار القيم في أول صفين يمثل الاتجاهين المزدوجين للرابط الفيزيائي $0 \to 1$ و $1 \to 0$ نظراً لتماثل الخصائص الفيزيائية للناقل نفسه)._
 
-$$Edge\_Attr_{batch} = \begin{bmatrix} -0.0015 & -0.0020 \\ -0.0015 & -0.0020 \\ \vdots & \vdots \\ \hline -0.0018 & -0.0022 \\ \vdots & \vdots \end{bmatrix}$$
+$$Edge\_Attr_{batch} = \left[ \begin{array}{cc} -0.0015 & -0.0020 \\ -0.0015 & -0.0020 \\ \vdots & \vdots \\ \hline -0.0018 & -0.0022 \\ \vdots & \vdots \end{array} \right]$$
 
 **3. الفرق الجوهري (الثبات مقابل الديناميكية):**
 
@@ -344,7 +344,7 @@ _الشيفرة المعمارية الحاكمة (Architectural Guardrail):_
     
 - **المعادلة:**
     
-    $$H_{latent} = \text{PowerGAT\_Conv}(X', \text{Edge\_Index}, \text{Edge\_Attr})$$
+    $$H_{latent} = PowerGAT\_Conv(X', Edge\_Index, Edge\_Attr)$$
     
 - **التنفيذ العملي لآلية الانتباه (Attention Mechanism):** يقرأ المعالج خريطة الاتصال (`Edge_Index`) ويقوم بدمج ميزات العقدة المُرسلة مع الخصائص الفيزيائية اللحظية للرابط (`Edge_Attr`). يعتمد المعالج في حساب "معامل الانتباه" ($\alpha_{ij}$) على قيم $\left[ \frac{\partial V}{\partial P}, \frac{\partial V}{\partial Q} \right]$ المستخرجة من أجهزة ESP32. هذا يوجه شبكة الـ GNN لفهم مدى التأثير الفيزيائي الفعلي لكل عقدة على جارتها في تلك اللحظة الزمنية، متجاوزاً القيود الساذجة للمسافات الجغرافية أو مقاومات الكابلات النظرية الثابتة.
     
